@@ -1,9 +1,12 @@
+import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { extract, extractSchema } from "./index";
 
 describe("extract", () => {
-    let emit: jest.Mock;
+    let emit: Mock;
 
-    beforeEach(() => (emit = jest.fn()));
+    beforeEach(() => {
+        emit = vi.fn();
+    });
 
     it("should allow you to extract simple references", function () {
         extract("{{foo.bar}}", emit);

@@ -4,31 +4,14 @@
     "description": "Extract references from Handlebars templates",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
-    "directories": {
-        "test": "test"
-    },
     "repository": {
         "type": "git",
         "url": "git+https://github.com/bborn/barhandles.git"
     },
     "scripts": {
         "build": "tsc -p .",
-        "prepublish": "npm run build",
-        "test": "jest"
-    },
-    "jest": {
-        "transform": {
-            "^.+\\.tsx?$": "ts-jest"
-        },
-        "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$",
-        "moduleFileExtensions": [
-            "ts",
-            "tsx",
-            "js",
-            "jsx",
-            "json",
-            "node"
-        ]
+        "prepublishOnly": "npm run build",
+        "test": "vitest run"
     },
     "keywords": [
         "handlebars"
@@ -37,11 +20,9 @@
     "contributors": ["Bruno Bornsztein"],
     "license": "ISC",
     "devDependencies": {
-        "@types/jest": "^29.5.12",
-        "jest": "^29.7.0",
-        "ts-jest": "^29.1.4",
-        "ts-node": "^10.9.2",
-        "typescript": "^5.4.5"
+        "typescript": "^7.0.2",
+        "vite": "^8.3.4",
+        "vitest": "^5.0.5"
     },
     "dependencies": {
         "handlebars": "^4.7.6"

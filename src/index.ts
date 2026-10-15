@@ -1,40 +1,38 @@
-import Handlebars from 'handlebars'
+import Handlebars from "handlebars";
 
 interface HelperDetails {
     each?: {
-        contextParam: number,
-        transmogrify: (path: any[]) => any[]
-    },
+        contextParam: number;
+        transmogrify: (path: any[]) => any[];
+    };
     with?: {
-        contextParam: number
-    },
+        contextParam: number;
+    };
     if?: {
-        optional: boolean
-    },
-    [key: string]: any
+        optional: boolean;
+    };
+    [key: string]: any;
 }
 
 const extract = (template: string, callback: Function, opts: HelperDetails = {}) => {
     const emit = (segs: string[], optional: boolean) => {
-        callback((segs || []).flat(), optional)
-      }
+        callback((segs || []).flat(), optional);
+    };
 
     const helperDetails: HelperDetails = {
-        ...{
-            each: {
-                contextParam: 0,
-                transmogrify(path: any[]) {
-                    const clone = path.slice(0);
-                    clone.push("#");
-                    return clone;
-                }
-            },
-            with: {
-                contextParam: 0
-            },
-            if: {
-                optional: true
+        each: {
+            contextParam: 0,
+            transmogrify(path: any[]) {
+                const clone = path.slice(0);
+                clone.push("#");
+                return clone;
             }
+        },
+        with: {
+            contextParam: 0
+        },
+        if: {
+            optional: true
         },
         ...opts
     };
@@ -43,11 +41,12 @@ const extract = (template: string, callback: Function, opts: HelperDetails = {})
 
     const extend = (path: any[], subpath: any) => {
         let clone;
-        if (subpath.original != null && subpath.original.startsWith("@root")) {
+        if (subpath.original?.startsWith("@root")) {
             clone = [...subpath.parts];
             return [clone.slice(1)];
-        } else if (subpath.original != null && subpath.original.startsWith("@")) {
-        } else if (subpath.original != null && subpath.original.startsWith("../")) {
+        } else if (subpath.original?.startsWith("@")) {
+            // do nothing
+        } else if (subpath.original?.startsWith("../")) {
             clone = path[path.length - 1] === "#" ? path.slice(0, -2) : path.slice(0, -1);
             clone.push(subpath.parts);
             return clone;
@@ -65,7 +64,7 @@ const extract = (template: string, callback: Function, opts: HelperDetails = {})
                 node.body.forEach((child: any) => visit(emit, path, child, optional));
                 break;
 
-            case "BlockStatement":
+            case "BlockStatement": {
                 helper = helperDetails[node.path.original];
                 let newPath = path;
                 node.params.forEach((child: any) =>
@@ -83,7 +82,7 @@ const extract = (template: string, callback: Function, opts: HelperDetails = {})
                 }
                 visit(emit, newPath, node.program, optional || (helper != null ? helper.optional : undefined));
                 break;
-
+            }
             case "PathExpression":
                 emit(extend(path, node), optional);
                 break;
@@ -113,7 +112,7 @@ const extractSchema = (template: string, opts: HelperDetails = {}) => {
     const obj: any = {};
     const callback = (path: any[], optional: boolean) => {
         const augment = (obj: any, path: any[]): any => {
-            obj._optional = obj.hasOwnProperty('_optional') ? optional && obj._optional : optional;
+            obj._optional = obj.hasOwnProperty("_optional") ? optional && obj._optional : optional;
             if (!(path.length === 0 || (path.length === 1 && path[0] === "length"))) {
                 obj._type = "object";
                 const segment = path[0];
@@ -134,7 +133,4 @@ const extractSchema = (template: string, opts: HelperDetails = {}) => {
     return obj;
 };
 
-export {
-    extract,
-    extractSchema
-};
+export { extract, extractSchema };
