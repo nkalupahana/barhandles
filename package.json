@@ -6,10 +6,14 @@
     "types": "dist/index.d.ts",
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/bborn/barhandles.git"
+        "url": "git+https://github.com/nkalupahana/barhandles.git"
     },
+    "files": [
+        "dist"
+    ],
     "scripts": {
-        "build": "tsc -p .",
+        "build": "tsc",
+        "prepare": "npm run build",
         "prepublishOnly": "npm run build",
         "test": "vitest run"
     },
@@ -17,7 +21,7 @@
         "handlebars"
     ],
     "author": "Wilfred Springer",
-    "contributors": ["Bruno Bornsztein"],
+    "contributors": ["Bruno Bornsztein", "Nisala Kalupahana"],
     "license": "ISC",
     "devDependencies": {
         "typescript": "^7.0.2",
