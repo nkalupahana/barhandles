@@ -45,8 +45,6 @@ describe("extract", () => {
     });
 
     it("should support generating a schema", function () {
-        expect(extractSchema).toBeDefined();
-        expect(typeof extractSchema).toBe("function");
         const template = `\
 {{#each foo}}
   {{bar}}
@@ -54,14 +52,25 @@ describe("extract", () => {
   {{../baz}}
 {{/each}}\
 `;
-        const schema = extractSchema(template);
-        expect(schema).toHaveProperty("foo");
-        expect(schema.foo).toHaveProperty("_type", "array");
-        expect(schema).toHaveProperty("baz");
-        expect(schema.baz).toHaveProperty("_type", "any");
-        expect(schema.foo).toHaveProperty("#");
-        expect(schema.foo["#"]).toHaveProperty("bar");
-        expect(schema.foo["#"].bar).toHaveProperty("_type", "any");
+        expect(extractSchema(template)).toEqual({
+            _type: "object",
+            foo: {
+                _optional: false,
+                _type: "array",
+                "#": {
+                    _optional: false,
+                    _type: "object",
+                    bar: {
+                        _optional: false,
+                        _type: "any"
+                    }
+                }
+            },
+            baz: {
+                _optional: false,
+                _type: "any"
+            }
+        });
     });
 
     it("should handle simple helpers correctly", function () {
@@ -83,11 +92,29 @@ describe("extract", () => {
 {{foo.bar.yoyo}}
 {{/if}}\
 `;
-        const schema = extractSchema(template);
-        expect(schema).toHaveProperty("foo");
-        expect(schema.foo).toHaveProperty("_optional", false);
-        expect(schema.foo).toHaveProperty("bar");
-        expect(schema.foo.bar).toHaveProperty("_optional", true);
+        expect(extractSchema(template)).toEqual({
+            _type: "object",
+            foo: {
+                _optional: false,
+                _type: "object",
+                baz: {
+                    _optional: false,
+                    _type: "any"
+                },
+                bar: {
+                    _optional: true,
+                    _type: "object",
+                    yoyo: {
+                        _optional: true,
+                        _type: "any"
+                    }
+                }
+            },
+            go: {
+                _optional: true,
+                _type: "any"
+            }
+        });
     });
 
     it("should allow you to add definitions for other directives", function () {
@@ -106,47 +133,78 @@ describe("extract", () => {
         const template = `\
 {{ternary foo.bar foo.baz foo.gum}}\
 `;
-        const schema = extractSchema(template, {
-            ternary: {
-                optional: true
+        expect(
+            extractSchema(template, {
+                ternary: {
+                    optional: true
+                }
+            })
+        ).toEqual({
+            _type: "object",
+            foo: {
+                _optional: true,
+                _type: "object",
+                bar: {
+                    _optional: true,
+                    _type: "any"
+                },
+                baz: {
+                    _optional: true,
+                    _type: "any"
+                },
+                gum: {
+                    _optional: true,
+                    _type: "any"
+                }
             }
         });
-        expect(schema).toHaveProperty("foo.bar._optional", true);
-        expect(schema).toHaveProperty("foo.baz._optional", true);
-        expect(schema).toHaveProperty("foo.gum._optional", true);
     });
 
     it("should ignore variables starting with @", function () {
         const template = `\
 {{@foo.bar}}\
 `;
-        const schema = extractSchema(template);
-        expect(schema).not.toHaveProperty("foo");
+        expect(extractSchema(template)).toEqual({
+            _type: "any"
+        });
     });
 
     it("should not consider something with length property to be an object", function () {
         const template = `\
 {{foo.length}}\
 `;
-        const schema = extractSchema(template);
-        expect(schema).toHaveProperty("foo");
-        expect(schema.foo).toHaveProperty("_type", "any");
+        expect(extractSchema(template)).toEqual({
+            _type: "object",
+            foo: {
+                _optional: false,
+                _type: "any"
+            }
+        });
     });
 
     it("should handle subexpressions", function () {
         const template = `\
 {{#if (isdefined value1)}}true{{else}}false{{/if}}
 `;
-        const schema = extractSchema(template);
-        expect(schema).toHaveProperty("value1");
+        expect(extractSchema(template)).toEqual({
+            _type: "object",
+            value1: {
+                _optional: true,
+                _type: "any"
+            }
+        });
     });
 
     it("should handle literal segments", function () {
         const template = `\
 {{[foo.0]}}
 `;
-        const schema = extractSchema(template);
-
-        expect(schema).toHaveProperty(["foo.0"]);
+        expect(extractSchema(template)).toEqual({
+            _type: "object",
+            "foo.0": {
+                _optional: false,
+                _type: "any"
+            }
+        });
     });
 });
