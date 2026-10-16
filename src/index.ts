@@ -18,7 +18,6 @@ interface SchemaBuilder {
     [segment: string]: SchemaBuilder | SchemaType | boolean | undefined;
 }
 
-/** Un-flattened walker path: path-part arrays, plus `"#"` for array items. */
 export type ContextPath = Array<string | string[]>;
 
 export type ExtractCallback = (path: string[], optional: boolean) => void;
