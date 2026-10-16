@@ -1,28 +1,59 @@
 import Handlebars from "handlebars";
 
-interface HelperDetails {
-    each?: {
-        contextParam: number;
-        transmogrify: (path: any[]) => any[];
-    };
-    with?: {
-        contextParam: number;
-    };
-    if?: {
-        optional: boolean;
-    };
-    [key: string]: any;
+export type SchemaType = "object" | "array" | "any";
+
+export type SchemaNode = {
+    _type: SchemaType;
+    _optional: boolean;
+} & { [segment: string]: SchemaNode };
+
+export type Schema = {
+    _type?: SchemaType;
+    _optional?: undefined;
+} & { [segment: string]: SchemaNode };
+
+interface SchemaBuilder {
+    _type?: SchemaType;
+    _optional?: boolean;
+    [segment: string]: SchemaBuilder | SchemaType | boolean | undefined;
 }
 
-const extract = (template: string, callback: Function, opts: HelperDetails = {}) => {
-    const emit = (segs: string[], optional: boolean) => {
+export type ContextPath = Array<string | string[]>;
+
+export type ExtractCallback = (path: string[], optional: boolean) => void;
+
+export interface HelperConfig {
+    contextParam?: number;
+    optional?: boolean;
+    transmogrify?: (path: ContextPath) => ContextPath;
+}
+
+export type HelperDetails = Record<string, HelperConfig | undefined>;
+
+interface PathNode {
+    original: string;
+    parts: string[];
+}
+
+interface AstNode extends PathNode {
+    type: string;
+    body: AstNode[];
+    path: AstNode;
+    params: AstNode[];
+    program: AstNode;
+}
+
+type Emit = (path: ContextPath | undefined, optional: boolean) => void;
+
+const extract = (template: string, callback: ExtractCallback, opts: HelperDetails = {}) => {
+    const emit: Emit = (segs, optional) => {
         callback((segs || []).flat(), optional);
     };
 
     const helperDetails: HelperDetails = {
         each: {
             contextParam: 0,
-            transmogrify(path: any[]) {
+            transmogrify(path) {
                 const clone = path.slice(0);
                 clone.push("#");
                 return clone;
@@ -37,50 +68,50 @@ const extract = (template: string, callback: Function, opts: HelperDetails = {})
         ...opts
     };
 
-    const parsed = Handlebars.parse(template);
+    const parsed = Handlebars.parse(template) as unknown as AstNode;
 
-    const extend = (path: any[], subpath: any) => {
-        let clone;
+    const extend = (path: ContextPath, subpath: PathNode): ContextPath | undefined => {
         if (subpath.original?.startsWith("@root")) {
-            clone = [...subpath.parts];
+            const clone = [...subpath.parts];
             return [clone.slice(1)];
         } else if (subpath.original?.startsWith("@")) {
             // do nothing
         } else if (subpath.original?.startsWith("../")) {
-            clone = path[path.length - 1] === "#" ? path.slice(0, -2) : path.slice(0, -1);
+            const clone = path[path.length - 1] === "#" ? path.slice(0, -2) : path.slice(0, -1);
             clone.push(subpath.parts);
             return clone;
         } else {
-            clone = [...path];
+            const clone = [...path];
             clone.push(subpath.parts);
             return clone;
         }
     };
 
-    const visit = (emit: Function, path: any[], node: any, optional: boolean = false) => {
-        let helper: any;
+    const visit = (emit: Emit, path: ContextPath, node: AstNode, optional: boolean = false) => {
+        let helper: HelperConfig | undefined;
+        const childOptional = (details: HelperConfig | undefined): boolean => Boolean(optional || details?.optional);
         switch (node.type) {
             case "Program":
-                node.body.forEach((child: any) => visit(emit, path, child, optional));
+                node.body.forEach((child) => visit(emit, path, child, optional));
                 break;
 
             case "BlockStatement": {
                 helper = helperDetails[node.path.original];
-                let newPath = path;
-                node.params.forEach((child: any) =>
-                    visit(emit, path, child, optional || (helper != null ? helper.optional : undefined))
-                );
-                if ((helper != null ? helper.contextParam : undefined) != null) {
-                    const replace = (path: any[]) => (newPath = path);
-                    visit(replace, path, node.params[helper.contextParam]);
+                let newPath: ContextPath | undefined = path;
+                node.params.forEach((child) => visit(emit, path, child, childOptional(helper)));
+                const contextParam = helper != null ? helper.contextParam : undefined;
+                if (contextParam != null) {
+                    const replace = (next: ContextPath | undefined) => {
+                        newPath = next;
+                    };
+                    visit(replace, path, node.params[contextParam]);
                     if ((helper != null ? helper.transmogrify : undefined) != null) {
+                        const details = helperDetails[node.path.original];
                         newPath =
-                            helperDetails[node.path.original] != null
-                                ? helperDetails[node.path.original].transmogrify(newPath)
-                                : undefined;
+                            details?.transmogrify != null ? details.transmogrify(newPath as ContextPath) : undefined;
                     }
                 }
-                visit(emit, newPath, node.program, optional || (helper != null ? helper.optional : undefined));
+                visit(emit, newPath as ContextPath, node.program, childOptional(helper));
                 break;
             }
             case "PathExpression":
@@ -88,18 +119,14 @@ const extract = (template: string, callback: Function, opts: HelperDetails = {})
                 break;
 
             case "SubExpression":
-                node.params.forEach((child: any) =>
-                    visit(emit, path, child, optional || (helper != null ? helper.optional : undefined))
-                );
+                node.params.forEach((child) => visit(emit, path, child, childOptional(helper)));
                 break;
             case "MustacheStatement":
                 helper = helperDetails[node.path.original];
                 if (node.params.length === 0) {
                     visit(emit, path, node.path, optional);
                 } else {
-                    node.params.forEach((child: any) =>
-                        visit(emit, path, child, optional || (helper != null ? helper.optional : undefined))
-                    );
+                    node.params.forEach((child) => visit(emit, path, child, childOptional(helper)));
                 }
                 break;
         }
@@ -108,29 +135,32 @@ const extract = (template: string, callback: Function, opts: HelperDetails = {})
     return visit(emit, [], parsed);
 };
 
-const extractSchema = (template: string, opts: HelperDetails = {}) => {
-    const obj: any = {};
-    const callback = (path: any[], optional: boolean) => {
-        const augment = (obj: any, path: any[]): any => {
-            obj._optional = obj.hasOwnProperty("_optional") ? optional && obj._optional : optional;
-            if (!(path.length === 0 || (path.length === 1 && path[0] === "length"))) {
-                obj._type = "object";
-                const segment = path[0];
+const extractSchema = (template: string, opts: HelperDetails = {}): Schema => {
+    const obj: SchemaBuilder = {};
+    const callback: ExtractCallback = (path, optional) => {
+        const augment = (node: SchemaBuilder, segments: string[]): SchemaBuilder => {
+            node._optional = Object.prototype.hasOwnProperty.call(node, "_optional")
+                ? optional && node._optional
+                : optional;
+            if (!(segments.length === 0 || (segments.length === 1 && segments[0] === "length"))) {
+                node._type = "object";
+                const segment = segments[0];
                 if (segment === "#") {
-                    obj._type = "array";
+                    node._type = "array";
                 }
-                obj[segment] = obj[segment] || {};
-                return augment(obj[segment], path.slice(1));
+                const child = (node[segment] || {}) as SchemaBuilder;
+                node[segment] = child;
+                return augment(child, segments.slice(1));
             } else {
-                obj._type = "any";
-                return obj;
+                node._type = "any";
+                return node;
             }
         };
-        return augment(obj, path);
+        augment(obj, path);
     };
     extract(template, callback, opts);
     delete obj._optional;
-    return obj;
+    return obj as Schema;
 };
 
 export { extract, extractSchema };
