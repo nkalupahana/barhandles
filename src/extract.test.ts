@@ -73,6 +73,10 @@ describe("extract", () => {
         });
     });
 
+    it("no template gives an empty schema", function () {
+        expect(extractSchema("")).toEqual({});
+    });
+
     it("should handle simple helpers correctly", function () {
         extract("{{currency amount}}", emit);
         expect(emit).toHaveBeenCalledWith(["amount"], false);
